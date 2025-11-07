@@ -154,7 +154,6 @@ export interface LiveSessionManager {
     onClose: () => void
   ) => Promise<void>;
   stop: () => void;
-  sendInputMessage: (message: string) => Promise<void>; // For sending text input to the live session
   session: Promise<Chat> | null;
   resetTranscription: () => void;
 }
@@ -300,23 +299,5 @@ export const createLiveSessionManager = (
     }
   };
 
-  const sendInputMessage = async (message: string) => {
-    if (sessionPromise) {
-      try {
-        const session = await sessionPromise;
-        // As per guidelines, `ai.models.generateContent` should be used for text answers without defining the model first.
-        // However, for the Live API, `session.sendMessage` is used to send user text input within an active chat session.
-        // The `Chat` interface correctly defines `sendMessage` method.
-        await (session as any).sendMessage({ message }); 
-      } catch (error) {
-        console.error("Error sending message to live session:", error);
-        throw error;
-      }
-    } else {
-      console.warn("Live session not active. Cannot send message.");
-    }
-  };
-
-
-  return { start, stop, sendInputMessage, session: sessionPromise, resetTranscription };
+  return { start, stop, session: sessionPromise, resetTranscription };
 };

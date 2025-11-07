@@ -27,6 +27,12 @@
         background-color: #6B7280; /* gray-500 on hover */
       }
     </style>
+<!-- 
+  NOTE: This importmap is specific to environments like Google AI Studio where dependencies 
+  are provided via CDN. For standard deployment (e.g., Vercel, Netlify), you would typically 
+  use a package.json file with a build tool like Vite or Create React App to bundle these
+  dependencies. A deployment failure might be related to this environment-specific setup.
+-->
 <script type="importmap">
 {
   "imports": {
