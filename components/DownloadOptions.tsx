@@ -44,11 +44,12 @@ const DownloadOptions: React.FC<DownloadOptionsProps> = ({
         );
 
         let offset = 0;
-        for (const buffer of tempBuffers) {
-          for (let channel = 0; channel < buffer.numberOfChannels; channel++) {
-            concatenatedBuffer.getChannelData(channel).set(buffer.getChannelData(channel), offset);
+        for (let channel = 0; channel < tempBuffers[0].numberOfChannels; channel++) {
+          let currentOffset = 0;
+          for (const buffer of tempBuffers) {
+            concatenatedBuffer.getChannelData(channel).set(buffer.getChannelData(channel), currentOffset);
+            currentOffset += buffer.length;
           }
-          offset += buffer.length;
         }
         combinedBuffer = concatenatedBuffer;
       }
@@ -82,12 +83,14 @@ const DownloadOptions: React.FC<DownloadOptionsProps> = ({
           <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
             {generatedAudioChunks.map((chunk, index) => (
               <div key={chunk.id} className="flex items-center justify-between p-3 bg-gray-700/50 rounded-lg border border-gray-600 shadow-sm hover:bg-gray-600/60 transition duration-150">
-                <span className="text-gray-300 text-sm truncate mr-2 font-mono">{index + 1}. {chunk.text}</span>
+                <span className="text-gray-300 text-sm truncate mr-2 font-mono" title={chunk.text}>{index + 1}. {chunk.text}</span>
                 <button
                   onClick={() => handleDownloadChunk(chunk)}
-                  className="py-1 px-3 bg-gray-600 hover:bg-gray-400 text-white rounded-md text-sm transition duration-200 shadow-sm"
+                  className="py-1 px-3 bg-gray-600 hover:bg-gray-400 text-white rounded-md text-sm transition duration-200 shadow-sm flex items-center"
                   title="Download individual chunk"
+                  aria-label={`Download audio chunk ${index + 1}: ${chunk.text}`}
                 >
+                  <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2z"></path></svg>
                   Download
                 </button>
               </div>
@@ -97,10 +100,15 @@ const DownloadOptions: React.FC<DownloadOptionsProps> = ({
             onClick={handleDownloadCombined}
             disabled={generatedAudioChunks.length === 0 || isCombining}
             className="w-full py-3 px-4 bg-gray-600 hover:bg-gray-400 text-white font-semibold rounded-lg disabled:opacity-50 transition duration-200 flex items-center justify-center space-x-2 shadow-md"
+            aria-busy={isCombining}
+            aria-label={isCombining ? 'Combining audio for download' : 'Download all generated audio as one WAV file'}
           >
             {isCombining && <LoadingSpinner />}
             <span>{isCombining ? 'Combining...' : 'Download Combined Audio (.wav)'}</span>
           </button>
+          <p className="text-xs text-gray-400 mt-1 text-center" id="combined-download-description">
+            Combines all generated audio segments into a single WAV file, ideal for long narrations or podcasts.
+          </p>
         </>
       )}
     </div>

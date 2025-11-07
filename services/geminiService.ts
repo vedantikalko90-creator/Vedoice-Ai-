@@ -45,7 +45,6 @@ export async function generateSpeech(
 ): Promise<GeneratedAudioChunk[]> {
   const { script, voiceId, narrationStyle, emotionBlend, speakerMode, multiSpeakerConfigs, systemInstruction, speechRate, onProgress } = options;
   const ai = getGenAI();
-  const chunks: GeneratedAudioChunk[] = [];
   const scriptSegments = script.split(/(\r?\n\r?\n|\. |\? |! |。|？|！)/).filter(s => s.trim() !== '');
 
   const totalChunks = scriptSegments.length;
@@ -61,16 +60,19 @@ export async function generateSpeech(
     }
   }
 
+  let processedCount = 0; // Keep track of successfully processed chunks for progress reporting
 
-  for (const segment of scriptSegments) {
-    if (segment.trim() === '') continue;
+  const segmentPromises = scriptSegments.map(async (segment, originalIndex) => {
+    if (segment.trim() === '') {
+      processedCount++; // Increment even for empty segments to ensure progress matches totalChunks
+      if (onProgress) {
+        onProgress(processedCount, totalChunks);
+      }
+      return { originalIndex, chunk: null };
+    }
 
-    const basePrompt = segment.trim();
-    let effectivePrompt = basePrompt;
+    const effectivePrompt = segment.trim();
     
-    // effectivePrompt is just basePrompt now, this is good.
-    effectivePrompt = basePrompt;
-
     const config: {
       responseModalities: Modality[];
       speechConfig: SpeechConfig;
@@ -82,8 +84,6 @@ export async function generateSpeech(
     if (speakerMode === 'single') {
       config.speechConfig.voiceConfig = { prebuiltVoiceConfig: { voiceName: voiceId } } as VoiceConfig;
     } else if (speakerMode === 'multi' && multiSpeakerConfigs && multiSpeakerConfigs.length > 0) {
-      // For multi-speaker, the prompt itself needs to contain speaker labels.
-      // The model then maps these to the provided voices.
       config.speechConfig.multiSpeakerVoiceConfig = {
         speakerVoiceConfigs: multiSpeakerConfigs.map(speaker => ({
           speaker: speaker.name,
@@ -91,10 +91,8 @@ export async function generateSpeech(
         })),
       } as MultiSpeakerVoiceConfig;
     } else {
-      // Fallback or error if speakerMode is not recognized or multi-speaker config is empty (should be caught by validation)
-      // This branch should ideally not be hit with proper validation
-      console.warn("Invalid speaker mode or missing speaker configuration for TTS generation.");
-      config.speechConfig.voiceConfig = { prebuiltVoiceConfig: { voiceName: voiceId || 'Zephyr' } } as VoiceConfig; // Provide a default to avoid empty speechConfig
+      console.warn("Invalid speaker mode or missing speaker configuration for TTS generation. Falling back to default voice.");
+      config.speechConfig.voiceConfig = { prebuiltVoiceConfig: { voiceName: voiceId || 'Zephyr' } } as VoiceConfig;
     }
 
     try {
@@ -112,17 +110,37 @@ export async function generateSpeech(
           DEFAULT_SAMPLE_RATE,
           1
         );
-        chunks.push({ id: crypto.randomUUID(), text: segment.trim(), audioBuffer });
+        processedCount++;
         if (onProgress) {
-          onProgress(chunks.length, totalChunks); // Report progress after each chunk
+          onProgress(processedCount, totalChunks); // Report progress after each chunk is ready
         }
+        return { originalIndex, chunk: { id: crypto.randomUUID(), text: segment.trim(), audioBuffer } };
+      } else {
+        processedCount++;
+        if (onProgress) {
+          onProgress(processedCount, totalChunks);
+        }
+        return { originalIndex, chunk: null }; // No audio data received
       }
     } catch (error: any) {
       console.error(`Error generating speech for segment "${segment.trim()}":`, error);
-      throw error;
+      processedCount++; // Still increment count even if an error occurred for this segment
+      if (onProgress) {
+        onProgress(processedCount, totalChunks);
+      }
+      throw error; // Re-throw to propagate the error and stop Promise.all
     }
-  }
-  return chunks;
+  });
+
+  const results = await Promise.all(segmentPromises);
+
+  // Filter out null chunks and sort them by their original index to maintain the script's order
+  const orderedChunks = results
+    .filter(res => res.chunk !== null)
+    .sort((a, b) => a.originalIndex - b.originalIndex)
+    .map(res => res.chunk as GeneratedAudioChunk);
+
+  return orderedChunks;
 }
 
 export interface LiveSessionManager {
