@@ -1,0 +1,7 @@
+{
+  "name": "Vedoice AI",
+  "description": "A sophisticated text-to-speech application powered by Gemini, offering multi-language support, custom narration styles, audio mixing, interactive voice control, and robust audio download options for both individual chunks and combined long scripts.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
