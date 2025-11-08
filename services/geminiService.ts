@@ -45,7 +45,19 @@ export async function generateSpeech(
 ): Promise<GeneratedAudioChunk[]> {
   const { script, voiceId, narrationStyle, emotionBlend, speakerMode, multiSpeakerConfigs, systemInstruction, speechRate, onProgress } = options;
   const ai = getGenAI();
-  const scriptSegments = script.split(/(\r?\n\r?\n|\. |\? |! |。|？|！)/).filter(s => s.trim() !== '');
+
+  // Correctly split script into sentences while keeping delimiters.
+  // This prevents sending empty or punctuation-only strings to the API, which can cause errors.
+  const segmentsWithDelimiters = script.split(/(\r?\n\r?\n|\. |\? |! |。|？|！)/);
+  const scriptSegments: string[] = [];
+  for (let i = 0; i < segmentsWithDelimiters.length; i += 2) {
+    const text = segmentsWithDelimiters[i];
+    const delimiter = segmentsWithDelimiters[i + 1] || '';
+    const combined = (text + delimiter).trim();
+    if (combined) {
+      scriptSegments.push(combined);
+    }
+  }
 
   const totalChunks = scriptSegments.length;
   if (onProgress) {
